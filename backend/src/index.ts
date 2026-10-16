@@ -19,6 +19,11 @@ async function main() {
 }
 
 main().catch((e) => {
+  console.error("Fatal boot error:", e?.message || e);
+  process.exit(1);
+});
+
+main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
