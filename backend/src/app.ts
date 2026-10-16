@@ -16,6 +16,9 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan("dev"));
 
+  app.get("/api/boot", (_req, res) => {
+    res.json({ boot: (global as any).__bootLog || [], env: { node: process.version, port: config.port, postgres: config.usePostgres, redis: config.useRedis } });
+  });
   app.get("/api/health", async (_req, res) => {
     const ai = aiStatus();
     let db: any = { ok: true, mode: config.usePostgres ? "postgres" : "sqlite" };
