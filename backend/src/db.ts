@@ -6,7 +6,6 @@ export type DbMode = "sqlite" | "postgres";
 
 let mode: DbMode = config.usePostgres ? "postgres" : "sqlite";
 let sqlite: any = null;
-let pgPool: any = null;
 
 const DATA_DIR = path.join(__dirname, "..", "data");
 const SQLITE_FILE = path.join(DATA_DIR, "relayops.db");
@@ -15,22 +14,49 @@ export function getMode(): DbMode {
   return mode;
 }
 
-async function pgQuery(text: string, params: any[] = []): Promise<{ rows: any[] }> {
-  if (!pgPool) {
-    const { Pool } = require("pg");
-    // Hosted Postgres (Render external, Neon) requires TLS; private-network and
-    // local instances typically speak plaintext. Hostnames with a dot are
-    // treated as external (TLS + SNI); bare internal hostnames stay plaintext.
-    // rejectUnauthorized:false keeps rotated certs working for a demo deploy.
-    let ssl: any = false;
-    try {
-      const host = new URL(config.databaseUrl).hostname || "";
-      if (host.includes(".")) ssl = { rejectUnauthorized: false, servername: host };
-    } catch {}
-    pgPool = new Pool({ connectionString: config.databaseUrl, ssl });
-    pgPool.on("error", (e: Error) => console.error("[db] pool error:", e.message));
+async function createPool(ssl: any): Promise<any> {
+  const { Pool } = require("pg");
+  const pool = new Pool({ connectionString: config.databaseUrl, ssl, connectionTimeoutMillis: 10000 });
+  pool.on("error", (e: Error) => console.error("[db] pool error:", e.message));
+  await pool.query("SELECT 1");
+  return pool;
+}
+
+// Hosted Postgres over the public internet needs TLS (with SNI); private-network
+// and local instances typically speak plaintext. Probe SSL first, fall back to
+// plaintext when the server drops TLS — the working pool is then cached.
+let pgPoolPromise: Promise<any> | null = null;
+
+function getPool(): Promise<any> {
+  if (!pgPoolPromise) {
+    pgPoolPromise = (async () => {
+      let host = "";
+      try { host = new URL(config.databaseUrl).hostname || ""; } catch {}
+      const attempts: any[] = host.includes(".")
+        ? [{ rejectUnauthorized: false, servername: host }, false]
+        : [false, { rejectUnauthorized: false, servername: host || undefined }];
+      let lastErr: any = null;
+      for (const ssl of attempts) {
+        try {
+          const pool = await createPool(ssl);
+          console.log(`[db] postgres connected (${ssl ? "tls" : "plaintext"})`);
+          return pool;
+        } catch (e: any) {
+          lastErr = e;
+          console.warn(`[db] connect (${ssl ? "tls" : "plaintext"}) failed: ${e.message}`);
+        }
+      }
+      throw lastErr || new Error("postgres unreachable");
+    })();
+    // allow retry on next call after a total failure
+    pgPoolPromise.catch(() => { pgPoolPromise = null; });
   }
-  return pgPool.query(text, params);
+  return pgPoolPromise;
+}
+
+async function pgQuery(text: string, params: any[] = []): Promise<{ rows: any[] }> {
+  const pool = await getPool();
+  return pool.query(text, params);
 }
 
 function sqliteDb(): any {
@@ -86,8 +112,21 @@ export async function dbRun(text: string, params: any[] = []): Promise<{ lastID?
   return { lastID: info?.lastInsertRowid, changes: Number(info?.changes ?? 0) };
 }
 
-export async function ensureSchema(): Promise<void> {
-  const isPg = mode === "postgres";
+export async function checkDb(): Promise<{ ok: boolean; error?: string; mode: DbMode }> {
+  try {
+    if (mode === "postgres") {
+      const pool = await getPool();
+      await pool.query("SELECT 1");
+    } else {
+      sqliteDb().exec("SELECT 1");
+    }
+    return { ok: true, mode };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || "unknown", mode };
+  }
+}
+
+export async function ensureSchema(): Promise<void> {  const isPg = mode === "postgres";
   const stmts = [
     `CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'admin', created_at TEXT NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS integrations (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'healthy', endpoint TEXT, csv_text TEXT, method TEXT NOT NULL DEFAULT 'GET', auth_type TEXT NOT NULL DEFAULT 'none', auth_secret TEXT, data_path TEXT NOT NULL DEFAULT '', api_key_hint TEXT, schedule TEXT NOT NULL DEFAULT 'every_15m', next_run_at TEXT, owner TEXT, description TEXT, mapping TEXT NOT NULL DEFAULT '[]', transforms TEXT NOT NULL DEFAULT '[]', validations TEXT NOT NULL DEFAULT '[]', last_run_at TEXT, last_status TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`,

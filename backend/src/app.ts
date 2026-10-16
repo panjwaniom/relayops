@@ -8,6 +8,7 @@ import jobRoutes from "./routes/jobs";
 import metaRoutes from "./routes/meta";
 import aiRoutes from "./routes/ai";
 import { aiStatus } from "./ai";
+import { checkDb } from "./db";
 
 export function createApp() {
   const app = express();
@@ -15,9 +16,18 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use(morgan("dev"));
 
-  app.get("/api/health", (_req, res) => {
+  app.get("/api/health", async (_req, res) => {
     const ai = aiStatus();
-    res.json({ ok: true, service: "relayops", time: new Date().toISOString(), postgres: config.usePostgres, redis: config.useRedis, ai: ai.configured, aiProvider: ai.provider, aiModel: ai.model, scheduler: true });
+    let db: any = { ok: true, mode: config.usePostgres ? "postgres" : "sqlite" };
+    try {
+      db = await Promise.race([
+        checkDb(),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("db check timeout")), 8000)),
+      ]);
+    } catch (e: any) {
+      db = { ok: false, error: e?.message || "db unreachable" };
+    }
+    res.json({ ok: true, service: "relayops", time: new Date().toISOString(), postgres: config.usePostgres, redis: config.useRedis, ai: ai.configured, aiProvider: ai.provider, aiModel: ai.model, scheduler: true, db });
   });
   app.use("/api/auth", authRoutes);
   app.use("/api/integrations", integrationRoutes);
