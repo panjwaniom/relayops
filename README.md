@@ -4,6 +4,8 @@
 
 **Connect any REST API or CSV. Map it, validate it, sync it — and understand every failure.**
 
+Repository: [github.com/panjwaniom/relayops](https://github.com/panjwaniom/relayops) · Live demo: [relayops-web-six.vercel.app](https://relayops-web-six.vercel.app)
+
 [![React](https://img.shields.io/badge/frontend-React%2018-61dafb?logo=react&logoColor=black)](./frontend)
 [![TypeScript](https://img.shields.io/badge/language-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/backend-Express%20%2B%20Node-339933?logo=node.js&logoColor=white)](./backend)
