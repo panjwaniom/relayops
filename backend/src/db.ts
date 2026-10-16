@@ -18,12 +18,16 @@ export function getMode(): DbMode {
 async function pgQuery(text: string, params: any[] = []): Promise<{ rows: any[] }> {
   if (!pgPool) {
     const { Pool } = require("pg");
-    // Hosted Postgres (Render, Neon) requires TLS; local containers typically don't.
-    // rejectUnauthorized:false keeps self-signed/rotated certs working for a demo deploy.
-    // servername (SNI) is required by some hosted proxies or they drop the connection.
-    let servername: string | undefined;
-    try { servername = new URL(config.databaseUrl).hostname || undefined; } catch {}
-    pgPool = new Pool({ connectionString: config.databaseUrl, ssl: { rejectUnauthorized: false, servername } });
+    // Hosted Postgres (Render external, Neon) requires TLS; private-network and
+    // local instances typically speak plaintext. Hostnames with a dot are
+    // treated as external (TLS + SNI); bare internal hostnames stay plaintext.
+    // rejectUnauthorized:false keeps rotated certs working for a demo deploy.
+    let ssl: any = false;
+    try {
+      const host = new URL(config.databaseUrl).hostname || "";
+      if (host.includes(".")) ssl = { rejectUnauthorized: false, servername: host };
+    } catch {}
+    pgPool = new Pool({ connectionString: config.databaseUrl, ssl });
     pgPool.on("error", (e: Error) => console.error("[db] pool error:", e.message));
   }
   return pgPool.query(text, params);

@@ -124,7 +124,6 @@ export async function executeSyncJob(jobId: string): Promise<void> {
         await dbRun(`INSERT INTO processed_hashes (hash, integration_id, job_id, created_at) VALUES (?, ?, ?, ?)`, [h, integration.id, jobId, now]);
       } catch {}
     }
-    // clear previous record rows for retried jobs? keep history per job id (job ids are unique per run)
     for (const r of result.records) {
       await dbRun(
         `INSERT INTO job_records (id, job_id, row_index, status, source_hash, input_json, output_json, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
