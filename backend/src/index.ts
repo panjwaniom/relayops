@@ -18,11 +18,23 @@ async function main() {
     process.exit(1);
   }
   const app = createApp();
-  // Listen first so liveness probes pass while the database warms up;
-  // schema migration retries in the background until it succeeds.
-  app.listen(config.port, () => {
-    log(`RelayOps API listening on http://localhost:${config.port}`);
-  });
+  // Listen first so liveness probes pass while the database warms up.
+  // Retry the bind: during rolling deploys the previous instance can briefly
+  // hold the port, and a single EADDRINUSE must not kill the boot.
+  const port = config.port;
+  for (let i = 1; ; i++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const server = app.listen(port, () => resolve());
+        server.on("error", reject);
+      });
+      log(`RelayOps API listening on http://localhost:${port}`);
+      break;
+    } catch (e: any) {
+      log(`[net] port ${port} busy (attempt ${i}): ${e?.message || e} — retrying in 3s`);
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
   try {
     await initQueue(executeSyncJob);
     log("[queue] ready");
