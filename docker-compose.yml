@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: relayops
+      POSTGRES_PASSWORD: relayops
+      POSTGRES_DB: relayops
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+  api:
+    build: ./backend
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://relayops:relayops@postgres:5432/relayops
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-relayops-dev-secret-change-me}
+      AI_API_KEY: ${AI_API_KEY:-}
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - redis
+  web:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+volumes:
+  pgdata:

@@ -1,0 +1,40 @@
+# Render blueprint: API + Postgres + Redis (free tiers suit a demo/portfolio deploy).
+# Create the blueprint from this file in the Render dashboard, then set the
+# secret env vars (JWT_SECRET, GOOGLE_API_KEY) in the dashboard — never commit them.
+services:
+  - type: web
+    name: relayops-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: relayops-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: relayops-redis
+          type: redis
+          property: connectionString
+      - key: FRONTEND_URL
+        value: https://relayops-web.vercel.app
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GOOGLE_API_KEY
+        sync: false # set in dashboard
+    healthCheckPath: /api/health
+
+  - type: redis
+    name: relayops-redis
+    ipAllowList: []
+
+databases:
+  - name: relayops-db
+    databaseName: relayops
+    user: relayops

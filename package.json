@@ -1,0 +1,17 @@
+{
+  "name": "relayops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RelayOps — API integration & data pipeline platform",
+  "scripts": {
+    "install:all": "npm --prefix backend install && npm --prefix frontend install",
+    "dev:api": "npm --prefix backend run dev",
+    "dev:web": "npm --prefix frontend run dev",
+    "build:api": "npm --prefix backend run build",
+    "build:web": "npm --prefix frontend run build",
+    "build": "npm run build:api && npm run build:web",
+    "test": "npm --prefix backend run test",
+    "typecheck": "npm --prefix backend run typecheck && npm --prefix frontend run typecheck",
+    "seed": "npm --prefix backend run build && node backend/dist/seed.js"
+  }
+}
