@@ -161,8 +161,16 @@ relayops/
 ## Deployment
 
 - **Frontend → Vercel:** import `frontend/`, framework preset Vite, `vercel.json` handles SPA rewrites; set `VITE_API_URL=https://<your-api>`.
-- **Backend → Render/Railway/Fly:** Node 20+, build `npm install && npm run build`, start `node dist/index.js`; attach managed Postgres (`DATABASE_URL`) and Redis (`REDIS_URL`); set `JWT_SECRET`, `FRONTEND_URL=https://<your-vercel-app>`, `AI_PROVIDER` + `GOOGLE_API_KEY`. `render.yaml` encodes the Render setup (free tiers suffice for demo traffic).
-- **Notes:** schema migrates itself on boot; the in-process scheduler runs on a single instance (fine for one Render instance — use Redis + BullMQ if you scale out); never run the demo seed password publicly — create a real account and rotate `JWT_SECRET`; CORS is restricted to `FRONTEND_URL`.
+- **Backend → Render/Railway/Fly:** Node 20+, build `npm install && npm run build`, start `node dist/index.js`; set `JWT_SECRET`, `FRONTEND_URL=https://<your-vercel-app>`, `AI_PROVIDER` + `GOOGLE_API_KEY`. `render.yaml` is a starting blueprint — read the notes inside it first.
+- **Database & queue — verified hosting reality (Oct 2026):**
+  | Setup | Cost | Scheduler? | Data durability |
+  |---|---|---|---|
+  | Render free web + free Postgres + free Key Value | $0 | ❌ sleeps after 15 min idle; Postgres deleted after 30 days; Redis in-memory only | demo only |
+  | Render web free + **Neon** Postgres free + **Upstash** Redis free | $0 | ⚠️ runs only while awake (fine for click-through demos) | durable |
+  | Render web 0.5c-512mb + Neon + Upstash | ~$7/mo | ✅ always-on scheduler | durable |
+  | Render all-paid (web + Postgres + Key Value) | ~$23/mo | ✅ | durable |
+  Render free Postgres **expires** (30d + 14d grace, then data deleted); Neon free has **no expiry** (scale-to-zero, cold start of a few seconds is fine for sync jobs). Upstash free Redis is persistent (250 MB / 500K cmds). BullMQ activates automatically when `REDIS_URL` is set; otherwise the built-in runner + scheduler handle jobs on a single instance.
+- **Notes:** schema migrates itself on boot; never run the demo seed publicly (`SEED_DEMO` stays unset, server enforces a real `JWT_SECRET` in production); create a real account and rotate `JWT_SECRET`; CORS is restricted to `FRONTEND_URL`.
 
 ## Roadmap
 

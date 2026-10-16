@@ -1,6 +1,16 @@
-# Render blueprint: API + Postgres + Redis (free tiers suit a demo/portfolio deploy).
-# Create the blueprint from this file in the Render dashboard, then set the
-# secret env vars (JWT_SECRET, GOOGLE_API_KEY) in the dashboard — never commit them.
+# Render blueprint — works, but read the cost/limits notes before relying on free tiers.
+#
+# VERIFIED 2026 LIMITS (see README deployment section):
+# - Free web services SLEEP after 15 min idle (~1 min wake) and share 750 hrs/mo.
+#   A sleeping backend pauses the 30s scheduler until the next request wakes it.
+#   For an always-on scheduler use a paid web instance (0.5c-512mb, ~$7/mo).
+# - Free Postgres EXPIRES 30 days after creation (+14-day grace, then deleted).
+#   For durable $0 data use Neon free (no expiry, scale-to-zero) instead.
+# - Free Key Value is in-memory only (25 MB) — BullMQ jobs vanish on restart.
+#   For durable $0 Redis use Upstash free (250 MB, persistent).
+# Recommended portfolio setup (~$0-7/mo): Vercel web + Render web (free or $7
+# always-on) + Neon Postgres + Upstash Redis. Set the secret env vars
+# (JWT_SECRET, GOOGLE_API_KEY) in the dashboard — never commit them.
 services:
   - type: web
     name: relayops-api
